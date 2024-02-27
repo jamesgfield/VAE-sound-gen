@@ -1,0 +1,7 @@
+notes:
+
+env stack:
+python 3.7
+tensorflow, keras
+
+conda activate VAE-sound-gen-env
