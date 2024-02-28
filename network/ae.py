@@ -1,3 +1,6 @@
+import os
+import pickle
+
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, ReLU, BatchNormalization, \
     Flatten, Dense, Reshape, Conv2DTranspose, Activation
@@ -55,6 +58,49 @@ class Autoencoder:
                        batch_size=batch_size,
                        epochs=num_epochs,
                        shuffle=True)
+        
+    def save(self, save_folder="."):
+        """Save (default is working dir ".")
+        1. Ensures save folder exists, if not creates it.
+        2. Saves params
+        3. Saves weights
+        """
+        self._create_folder_if_it_doesnt_exist(save_folder)
+        self._save_parameters(save_folder) # constructor-passed params (need to store to recreate)
+        self._save_weights(save_folder) # trained weights also need to be stored
+
+    def load_weights(self, weights_path):
+        self.model.load_weights(weights_path) # .load_weights is keras model method
+
+    @classmethod
+    def load(cls, save_folder="."):
+        parameters_path = os.path.join(save_folder, "parameters.pkl")
+        with open(parameters_path, "rb") as f:
+            parameters = pickle.load(f)
+        autoencoder = Autoencoder(*parameters)
+        weights_path = os.path.join(save_folder, "weights.h5")
+        autoencoder.load_weights(weights_path)
+        return autoencoder
+
+    def _create_folder_if_it_doesnt_exist(self, folder):
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+
+    def _save_parameters(self, save_folder):
+        parameters = [
+            self.input_shape,
+            self.conv_filters,
+            self.conv_kernels,
+            self.conv_strides,
+            self.latent_space_dim
+        ]
+        save_path = os.path.join(save_folder, "parameters.pkl")
+        with open(save_path, "wb") as f:
+            pickle.dump(parameters, f)
+
+    def _save_weights(self, save_folder):
+        save_path = os.path.join(save_folder, "weights.h5") # h5 is a keras format for storing weights
+        self.model.save_weights(save_path)
 
     def _build(self):
         """
