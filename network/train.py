@@ -24,7 +24,7 @@ def train(x_train, learning_rate, batch_size, epochs):
         conv_filters=(32, 64, 64, 64),
         conv_kernels=(3, 3, 3, 3),
         conv_strides=(1, 2, 2, 1),
-        latent_space_dim=2
+        latent_space_dim=2 # 10, 20, 30 would improve reconstruction
     )
     autoencoder.summary()
     autoencoder.compile(learning_rate)
@@ -34,7 +34,7 @@ def train(x_train, learning_rate, batch_size, epochs):
 
 if __name__ == "__main__":
     x_train, _, _, _ = load_mnist()
-    autoencoder = train(x_train[:500], LEARNING_RATE, BATCH_SIZE, EPOCHS)
+    autoencoder = train(x_train[:10000], LEARNING_RATE, BATCH_SIZE, EPOCHS)
     autoencoder.save("model") # save model (params & weights in separate files)
     autoencoder2 = Autoencoder.load("model") # load model (class method in ae class)
     autoencoder2.summary() # check to see if load is successful

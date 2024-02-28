@@ -72,6 +72,16 @@ class Autoencoder:
     def load_weights(self, weights_path):
         self.model.load_weights(weights_path) # .load_weights is keras model method
 
+    def reconstruct(self, images):
+        """Method reconstructs images it is passed."""
+        # Use encoder to create latent space representation of the images
+        # Images -> Encoder -> Latent Representations
+        latent_representations =  self.encoder.predict(images) 
+        # Input latent space representations into the decoder to reconstruct images
+        # Latent representations -> Decoder -> Reconstructed Images
+        reconstructed_images = self.decoder.predict(latent_representations)
+        return reconstructed_images, latent_representations
+
     @classmethod
     def load(cls, save_folder="."):
         parameters_path = os.path.join(save_folder, "parameters.pkl")
