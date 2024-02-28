@@ -31,6 +31,7 @@ class Autoencoder:
         # private attributes
         self._num_conv_layers = len(conv_filters)
         self._shape_before_bottleneck = None
+        self._model_input = None
 
         # _build method to instanciate an Autoencoder model
         self._build()
@@ -39,6 +40,7 @@ class Autoencoder:
         """Prints on console architecture information"""
         self.encoder.summary()
         self.decoder.summary()
+        self.model.summary()
 
 
     def _build(self):
@@ -48,7 +50,14 @@ class Autoencoder:
         """
         self._build_encoder()
         self._build_decoder()
-        # self._build_autoencoder()
+        self._build_autoencoder()
+
+    def _build_autoencoder(self):
+        model_input = self._model_input
+        # apply encoder to input, then decoder to output of encoder
+        # this is output of entire autoencoder
+        model_output = self.decoder(self.encoder(model_input))
+        self.model = Model(model_input, model_output, name="autoencoder")
 
     def _build_decoder(self):
         decoder_input = self._add_decoder_input()
@@ -114,6 +123,7 @@ class Autoencoder:
         encoder_input = self._add_encoder_input()
         conv_layers = self._add_conv_layers(encoder_input)
         bottleneck = self._add_bottleneck(conv_layers)
+        self._model_input = encoder_input
         self.encoder = Model(encoder_input, bottleneck, name="encoder") # input, output, name
 
     def _add_encoder_input(self):
