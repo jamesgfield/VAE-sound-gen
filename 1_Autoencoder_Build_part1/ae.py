@@ -1,7 +1,8 @@
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, ReLU, BatchNormalization, \
-    Flatten, Dense
+    Flatten, Dense, Reshape, Conv2DTranspose, Activation
 from tensorflow.keras import backend as K
+import numpy as np
 
 
 
@@ -37,6 +38,8 @@ class Autoencoder:
     def summary(self):
         """Prints on console architecture information"""
         self.encoder.summary()
+        self.decoder.summary()
+
 
     def _build(self):
         """
@@ -44,8 +47,68 @@ class Autoencoder:
         to build all parts on the architecture.
         """
         self._build_encoder()
-        # self._build_decoder()
+        self._build_decoder()
         # self._build_autoencoder()
+
+    def _build_decoder(self):
+        decoder_input = self._add_decoder_input()
+        dense_layer = self._add_dense_layer(decoder_input)
+        reshape_layer = self._add_reshape_layer(dense_layer) # reshape dense layer into 3d array
+        conv_transpose_layers = self._add_conv_transpose_layers(reshape_layer)
+        decoder_output = self._add_decoder_output(conv_transpose_layers)
+        self.decoder = Model(decoder_input, decoder_output, name="decoder")
+
+    def _add_decoder_input(self):
+        return Input(shape=self.latent_space_dim, name="decoder_input")
+    
+    def _add_dense_layer(self, decoder_input):
+        num_neurons = np.prod(self._shape_before_bottleneck) # [1, 2, 4] -> want flattened version of this -> 8 (np.prod)
+        dense_layer = Dense(num_neurons, name="decoder_dense")(decoder_input) # apply dense layer to decoder input
+        return dense_layer
+    
+    def _add_reshape_layer(self, dense_layer):
+        """Go back to 3D array from flattened layer"""
+        reshape_layer = Reshape(self._shape_before_bottleneck)(dense_layer) # pass in target shape
+        return reshape_layer
+    
+    def _add_conv_transpose_layers(self, x): # pass generic graph of layers, 'x'
+        """Add conv transpose blocks."""
+        # loop through all conv layers in reverse order and stop at the first layer
+        # don't want to apply conv transpose block to first layer
+        for layer_index in reversed(range(1, self._num_conv_layers)):
+            # [0, 1, 2] say we have 3 conv layers
+            # want the reverse: [2, 1, 0], also want to drop 0th (first conv layer)
+            # [1, 2] -> [2, 1] is new loop
+            x = self._add_conv_transpose_layer(layer_index, x)
+        return x
+
+    def _add_conv_transpose_layer(self, layer_index, x):
+            layer_num = self._num_conv_layers - layer_index
+            conv_transpose_layer = Conv2DTranspose(
+                filters=self.conv_filters[layer_index],
+                kernel_size=self.conv_kernels[layer_index],
+                strides=self.conv_strides[layer_index],
+                padding="same",
+                name=f"decoder_conv_transpose_layer_{layer_num}"
+            )
+            x = conv_transpose_layer(x)
+            x = ReLU(name=f"decoder_relu_{layer_num}")(x)
+            x = BatchNormalization(name=f"decoder_bn_{layer_num}")(x)
+            return x
+    
+    def _add_decoder_output(self, x):
+        """Add final conv transpose layer, but don't want relu & bn
+        Instead sigmoid activation function"""
+        conv_transpose_layer = Conv2DTranspose(
+                filters=1, # [24, 24, 1] [height, width, channel]
+                kernel_size=self.conv_kernels[0], # get first conv input shape kernel nums
+                strides=self.conv_strides[0],
+                padding="same",
+                name=f"decoder_conv_transpose_layer_{self._num_conv_layers}"
+            )
+        x = conv_transpose_layer(x)
+        output_layer = Activation("sigmoid", name="sigmoid_layer")(x)
+        return output_layer
 
     def _build_encoder(self):
         encoder_input = self._add_encoder_input()
