@@ -3,7 +3,7 @@ import pickle
 
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Input, Conv2D, ReLU, BatchNormalization, \
-    Flatten, Dense, Reshape, Conv2DTranspose, Activation
+    Flatten, Dense, Reshape, Conv2DTranspose, Activation, Lambda
 from tensorflow.keras import backend as K
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import MeanSquaredError
@@ -229,15 +229,37 @@ class VAE:
         return x
     
     def _add_bottleneck(self, x):
-        """Flatten data and add bottleneck (Dense Layer)."""
+        """Flatten data and add bottleneck with Gaussian Sampling (Dense Layer)."""
         # need to store info on shape of data before it is flattened
         # for decoder, we must mirror the process, i.e go from flatten -> 3d arrays
         self._shape_before_bottleneck = K.int_shape(x)[1:] # [2, 7, 7, 32] 4d array, [batch size, width, height, num_channels]
         # batch size dimension ignored, [1:]
 
         x = Flatten()(x) # flattened data
-        x = Dense(self.latent_space_dim, name="encoder_output")(x)
+        self.mu = Dense(self.latent_space_dim, name="mu")(x) # represents mean vector
+        self.log_variance = Dense(self.latent_space_dim,
+                                   name="log_variance")(x) # represents log variance vector
+        # no longer a sequential graph: i.e we take the graph built so far and
+        # branch it out into two dense layers x-->mu & x-->log_variance
+        # (two separate dense layers have been applied to the graph x)
+
+        def sample_point_from_normal_distribution(args):
+            "z = mu + sigma*epsilon (sigma = e^(log_variance/2))"
+            mu, log_variance = args
+            # sample a point from the random normal dist.
+            epsilon = K.random_normal(shape=K.shape(self.mu), mean=0.,
+                                       stddev=1.)
+            sampled_point = mu + K.exp(log_variance / 2) * epsilon
+            return sampled_point
+
+        # next: sample a data point from the gaussian distribution that is parameterised by mu and log_variance dense layers
+        # this can be done using keras' lambda layer: this layer can wrap functions within our graph
+        x = Lambda(sample_point_from_normal_distribution,
+                    name="encoder_output")([self.mu, self.log_variance])
+
         return x
+
+#############################################################################
 
 class Autoencoder:
     """
@@ -464,6 +486,8 @@ class Autoencoder:
         x = Dense(self.latent_space_dim, name="encoder_output")(x)
         return x
     
+#############################################################################
+
 if __name__ == "__main__":
     autoencoder = VAE(
         input_shape=(28, 28, 1),
