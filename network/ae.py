@@ -8,6 +8,11 @@ from tensorflow.keras import backend as K
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.losses import MeanSquaredError
 import numpy as np
+import tensorflow as tf
+
+
+tf.compat.v1.disable_eager_execution()
+
 
 class VAE:
     """
