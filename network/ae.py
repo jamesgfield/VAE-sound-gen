@@ -31,6 +31,7 @@ class VAE:
         self.conv_kernels = conv_kernels # [3, 5, 3] 1st conv layer, 3x3 kernel size, 2nd 5x5 etc.
         self.conv_strides = conv_strides # [1, 2, 2] 1st conv layer, stride = 1, then = 2. Stride 2 = downsampling the data
         self.latent_space_dim = latent_space_dim # 2 (integer, bottleneck will have 2 dimensions for example)
+        self.reconstruction_loss_weight = 1000
 
         self.encoder = None
         self.decoder = None
@@ -52,8 +53,10 @@ class VAE:
 
     def compile(self, learning_rate=0.0001):
         optimizer = Adam(learning_rate=learning_rate)
-        mse_loss = MeanSquaredError()
-        self.model.compile(optimizer=optimizer, loss=mse_loss) # compile method native in keras api
+        self.model.compile(optimizer=optimizer,
+                            loss=self._calculate_combined_loss,
+                            metrics=[self._calculate_reconstruction_loss,
+                                     self._calculate_KL_loss]) # compile method native in keras api
 
     def train(self, x_train, batch_size, num_epochs):
         self.model.fit(x_train, # input is training set
@@ -94,6 +97,27 @@ class VAE:
         weights_path = os.path.join(save_folder, "weights.h5")
         autoencoder.load_weights(weights_path)
         return autoencoder
+    
+    def _calculate_combined_loss(self, y_target, y_predicted):
+        """loss = alpha*RMSE + kl_loss, where alpha is a weight for the reconstruction loss penalty"""
+        reconstruction_loss = self._calculate_reconstruction_loss(y_target, y_predicted)
+        kl_loss = self._calculate_KL_loss(y_target, y_predicted)
+        combined_loss = self.reconstruction_loss_weight * reconstruction_loss\
+                                                          + kl_loss
+        return combined_loss
+
+    def _calculate_reconstruction_loss(self, y_target, y_predicted):
+        """custom implementation of MSE loss term in keras"""
+        error = y_target - y_predicted
+        reconstruction_loss = K.mean(K.square(error), axis=[1, 2, 3])
+        return reconstruction_loss
+    
+    def _calculate_KL_loss(self, y_target, y_predicted): # keras expects y_target and y_predicted as args for a loss function, even if unused.
+        """custom implementation of KL loss term in keras"""
+        """KL loss calculates difference between two distributions"""
+        kl_loss = - 0.5 * K.sum(1 + self.log_variance - K.square(self.mu) - 
+                                K.exp(self.log_variance), axis=1)
+        return kl_loss
 
     def _create_folder_if_it_doesnt_exist(self, folder):
         if not os.path.exists(folder):

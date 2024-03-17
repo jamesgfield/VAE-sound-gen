@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from ae import Autoencoder
+from ae import VAE
 from train import load_mnist
 
 
@@ -40,7 +41,7 @@ def plot_images_encoded_in_latent_space(latent_representations, sample_labels):
     plt.show()
 
 if __name__ == "__main__":
-    autoencoder = Autoencoder.load("model")
+    autoencoder = VAE.load("model")
     x_train, y_train, x_test, y_test = load_mnist()
     
     # compare original images with reconstructed versions of the same
